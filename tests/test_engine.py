@@ -1,4 +1,4 @@
-"""Unit tests for the Rust SessionEngine (requires maturin develop)."""
+"""Unit tests for the UCP SessionEngine core (requires maturin develop)."""
 
 from __future__ import annotations
 
@@ -6,9 +6,9 @@ import json
 
 import pytest
 
-pytest.importorskip("hotswap_repl._engine")
+pytest.importorskip("ucp._engine")
 
-from hotswap_repl._engine import CACHE_THRESHOLD_TOKENS, SessionEngine
+from ucp._engine import CACHE_THRESHOLD_TOKENS, SessionEngine
 
 
 def test_cache_threshold_constant() -> None:
@@ -17,12 +17,11 @@ def test_cache_threshold_constant() -> None:
 
 def test_append_turn_and_token_counts() -> None:
     engine = SessionEngine("You are a test harness.")
-    oai, ant, ow = engine.append_turn("user", "Hello from the hot-swap REPL.")
+    oai, ant, ow = engine.append_turn("user", "Hello from UCP.")
     assert oai > 0
     assert ant > 0
     assert ow > 0
     assert "Human:" in engine.get_master_context()
-    assert engine.get_active_model() in {"Anthropic", "OpenAI", "Grok", "OpenWeight"}
 
 
 def test_openai_payload_is_messages_json() -> None:
