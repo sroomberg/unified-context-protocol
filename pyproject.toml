@@ -1,0 +1,80 @@
+[build-system]
+requires = ["maturin>=1.7,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "hotswap-repl"
+version = "0.1.0"
+description = "Zero-token-burn cross-model LLM REPL with hot-swapping between OpenAI, Anthropic, Grok, and open-weight providers"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Unified Context Protocol" }]
+keywords = ["llm", "repl", "hot-swap", "prompt-caching", "textual", "pyo3"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Rust",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "textual>=0.80.0",
+    "httpx>=0.27.0",
+    "aiohttp>=3.10.0",
+    "pydantic>=2.7.0",
+    "pydantic-settings>=2.3.0",
+    "python-dotenv>=1.0.0",
+    "rich>=13.7.0",
+    "typing-extensions>=4.12.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.2.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-cov>=5.0.0",
+    "mypy>=1.10.0",
+    "ruff>=0.5.0",
+    "maturin>=1.7.0",
+]
+
+[project.scripts]
+hotswap-repl = "hotswap_repl.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/example/unified-context-protocol"
+Documentation = "https://github.com/example/unified-context-protocol#readme"
+
+[tool.maturin]
+features = ["pyo3/extension-module"]
+module-name = "hotswap_repl._engine"
+python-source = "python"
+manifest-path = "Cargo.toml"
+include = [
+    "python/hotswap_repl/**/*.py",
+    "tokenizers/.gitkeep",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+pythonpath = ["python"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+packages = ["hotswap_repl"]
+mypy_path = "python"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "ASYNC"]
