@@ -13,9 +13,9 @@ use std::sync::Arc;
 impl From<UcpError> for PyErr {
     fn from(err: UcpError) -> Self {
         match err {
-            UcpError::InvalidFamily(m) | UcpError::InvalidTemplate(m) | UcpError::TokenizerNotFound(m) => {
-                PyValueError::new_err(m)
-            }
+            UcpError::InvalidFamily(m)
+            | UcpError::InvalidTemplate(m)
+            | UcpError::TokenizerNotFound(m) => PyValueError::new_err(m),
             other => PyRuntimeError::new_err(other.to_string()),
         }
     }
@@ -38,7 +38,11 @@ impl PySessionEngine {
     }
 
     /// Append text and realign tokenizers (GIL released).
-    fn append_text_and_align(&self, py: Python<'_>, text: String) -> PyResult<(usize, usize, usize)> {
+    fn append_text_and_align(
+        &self,
+        py: Python<'_>,
+        text: String,
+    ) -> PyResult<(usize, usize, usize)> {
         let engine = Arc::clone(&self.inner);
         py.allow_threads(move || engine.append_text_and_align(text))
             .map_err(PyErr::from)
