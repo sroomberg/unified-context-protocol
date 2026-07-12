@@ -5,7 +5,7 @@ build-backend = "maturin"
 [project]
 name = "ucp"
 version = "0.1.0"
-description = "Unified Context Protocol — infra for linear cross-model context, tokenizer alignment, and provider payload transposition"
+description = "Optional Python bindings for Unified Context Protocol (Rust core is primary)"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
@@ -50,7 +50,7 @@ Homepage = "https://github.com/sroomberg/unified-context-protocol"
 Documentation = "https://github.com/sroomberg/unified-context-protocol#readme"
 
 [tool.maturin]
-features = ["pyo3/extension-module"]
+features = ["python"]
 module-name = "ucp._engine"
 python-source = "python"
 manifest-path = "Cargo.toml"

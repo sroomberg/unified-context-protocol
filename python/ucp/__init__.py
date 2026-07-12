@@ -1,7 +1,8 @@
-"""Unified Context Protocol (UCP) infrastructure.
+"""Optional Python bindings for Unified Context Protocol (UCP).
 
-Pure context-alignment and payload-transposition layer. No network I/O,
-no TUI, no agent runtime — those belong in separate clients (e.g. OpenCode).
+The protocol core is the Rust ``ucp`` crate. This package is a convenience
+layer (PyO3 ``SessionEngine`` plus pure payload helpers). Runtimes that do
+not need Python can depend on the Rust crate alone.
 """
 
 from __future__ import annotations
