@@ -1,0 +1,36 @@
+[package]
+name = "hotswap_repl"
+version = "0.1.0"
+edition = "2021"
+description = "Cross-model hot-swapping REPL harness — Rust SessionEngine core"
+license = "MIT"
+authors = ["Unified Context Protocol"]
+readme = "README.md"
+repository = "https://github.com/example/unified-context-protocol"
+
+[lib]
+name = "hotswap_repl"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+pyo3 = { version = "0.22", features = ["extension-module", "abi3-py39"] }
+rayon = "1.10"
+parking_lot = "0.12"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "1.0"
+tiktoken-rs = "0.6"
+tokenizers = { version = "0.20", default-features = false, features = ["onig"] }
+once_cell = "1.19"
+regex = "1.11"
+# Pinned for rustc 1.83 compatibility (tokenizers transitive dep).
+unicode-segmentation = "=1.12.0"
+
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = 3
+strip = true
+
+[profile.dev]
+opt-level = 1
