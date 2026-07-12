@@ -1,8 +1,8 @@
-//! Cross-model hot-swapping SessionEngine.
+//! Unified Context Protocol — SessionEngine core.
 //!
-//! Maintains an append-only master conversation context and dual-aligns
-//! character offsets to OpenAI (tiktoken) and HuggingFace / Anthropic-style
-//! tokenizers concurrently, releasing the Python GIL during intensive work.
+//! Pure infra for an append-only master conversation context with concurrent
+//! OpenAI (tiktoken) and HuggingFace / Anthropic-style tokenizer alignment.
+//! Releases the Python GIL during intensive work. No network I/O or agent UX.
 
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
