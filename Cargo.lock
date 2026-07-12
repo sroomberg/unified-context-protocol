@@ -227,23 +227,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
 
 [[package]]
-name = "hotswap_repl"
-version = "0.1.0"
-dependencies = [
- "once_cell",
- "parking_lot",
- "pyo3",
- "rayon",
- "regex",
- "serde",
- "serde_json",
- "thiserror",
- "tiktoken-rs",
- "tokenizers",
- "unicode-segmentation",
-]
-
-[[package]]
 name = "ident_case"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -809,6 +792,23 @@ dependencies = [
  "unicode-normalization-alignments",
  "unicode-segmentation",
  "unicode_categories",
+]
+
+[[package]]
+name = "ucp"
+version = "0.1.0"
+dependencies = [
+ "once_cell",
+ "parking_lot",
+ "pyo3",
+ "rayon",
+ "regex",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tiktoken-rs",
+ "tokenizers",
+ "unicode-segmentation",
 ]
 
 [[package]]

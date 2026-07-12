@@ -1,15 +1,14 @@
 [package]
-name = "hotswap_repl"
+name = "ucp"
 version = "0.1.0"
 edition = "2021"
-description = "Cross-model hot-swapping REPL harness — Rust SessionEngine core"
+description = "Unified Context Protocol — cross-model context alignment and payload transposition infra"
 license = "MIT"
 authors = ["Unified Context Protocol"]
 readme = "README.md"
-repository = "https://github.com/example/unified-context-protocol"
 
 [lib]
-name = "hotswap_repl"
+name = "ucp"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
