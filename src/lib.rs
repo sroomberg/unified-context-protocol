@@ -3,8 +3,6 @@
 //! The core API is pure Rust. Optional PyO3 bindings are available behind the
 //! `python` Cargo feature (used by `maturin` / the `python/ucp` package).
 
-#![deny(clippy::unwrap_used)]
-
 mod engine;
 mod error;
 

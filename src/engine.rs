@@ -18,13 +18,11 @@ use crate::error::{UcpError, UcpResult};
 /// Minimum tokens typically required before provider prompt caches activate.
 pub const CACHE_THRESHOLD_TOKENS: usize = 1024;
 
-static CHATML_SPLIT: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"(?s)<\|im_start\|>(\w+)\n(.*?)<\|im_end\|>").expect("chatml regex")
-});
+static CHATML_SPLIT: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(?s)<\|im_start\|>(\w+)\n(.*?)<\|im_end\|>").expect("chatml regex"));
 
-static ANTHROPIC_SPLIT: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"(?s)(?:^|\n)(System|Human|Assistant)\s*:\s*(.*?)(?=(?:\n(?:System|Human|Assistant)\s*:)|\z)")
-        .expect("anthropic regex")
+static ANTHROPIC_HEADER: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"(?m)^(System|Human|Assistant)\s*:\s*").expect("anthropic header regex")
 });
 
 /// Absolute character span mapped to a single model token.
@@ -181,9 +179,7 @@ fn encode_with_backend(
             let mut spans = Vec::with_capacity(tokens.len());
             let mut cursor = 0usize;
             for &tid in &tokens {
-                let piece = bpe
-                    .decode(vec![tid])
-                    .unwrap_or_else(|_| "�".to_string());
+                let piece = bpe.decode(vec![tid]).unwrap_or_else(|_| "�".to_string());
                 let start = base_offset + cursor;
                 // Prefer exact substring match at cursor; fall back to piece length in chars.
                 let piece_chars = piece.chars().count();
@@ -199,7 +195,7 @@ fn encode_with_backend(
                 spans.push(TokenSpan {
                     char_start: start,
                     char_end: end.min(base_offset + text.chars().count()),
-                    token_id: tid as u32,
+                    token_id: tid,
                 });
             }
             // Clamp final end to actual text length.
@@ -320,11 +316,7 @@ fn realign_all(state: &mut SessionState) -> Result<(), String> {
         .collect();
     for result in extra_results {
         let (name, spans) = result?;
-        state
-            .extra_tables
-            .entry(name)
-            .or_default()
-            .spans = spans;
+        state.extra_tables.entry(name).or_default().spans = spans;
     }
 
     Ok(())
@@ -335,8 +327,14 @@ fn parse_turns_from_master(master: &str, system_prompt: &str) -> Vec<MessageTurn
     if master.contains("<|im_start|>") {
         let mut turns = Vec::new();
         for cap in CHATML_SPLIT.captures_iter(master) {
-            let role = cap.get(1).map(|m| m.as_str().to_string()).unwrap_or_default();
-            let content = cap.get(2).map(|m| m.as_str().to_string()).unwrap_or_default();
+            let role = cap
+                .get(1)
+                .map(|m| m.as_str().to_string())
+                .unwrap_or_default();
+            let content = cap
+                .get(2)
+                .map(|m| m.as_str().to_string())
+                .unwrap_or_default();
             let whole = cap.get(0).unwrap();
             let char_start = master[..whole.start()].chars().count();
             let char_end = char_start + whole.as_str().chars().count();
@@ -350,22 +348,25 @@ fn parse_turns_from_master(master: &str, system_prompt: &str) -> Vec<MessageTurn
         return turns;
     }
 
-    if ANTHROPIC_SPLIT.is_match(master) {
+    if ANTHROPIC_HEADER.is_match(master) {
+        let headers: Vec<_> = ANTHROPIC_HEADER.find_iter(master).collect();
         let mut turns = Vec::new();
-        for cap in ANTHROPIC_SPLIT.captures_iter(master) {
-            let role = cap
-                .get(1)
+        for (i, mat) in headers.iter().enumerate() {
+            let role_cap = ANTHROPIC_HEADER
+                .captures(mat.as_str())
+                .and_then(|c| c.get(1))
                 .map(|m| m.as_str().to_lowercase())
                 .unwrap_or_else(|| "user".into());
-            let content = cap
-                .get(2)
-                .map(|m| m.as_str().trim().to_string())
-                .unwrap_or_default();
-            let whole = cap.get(0).unwrap();
-            let char_start = master[..whole.start()].chars().count();
-            let char_end = char_start + whole.as_str().chars().count();
+            let content_start = mat.end();
+            let content_end = headers
+                .get(i + 1)
+                .map(|n| n.start())
+                .unwrap_or(master.len());
+            let content = master[content_start..content_end].trim().to_string();
+            let char_start = master[..mat.start()].chars().count();
+            let char_end = master[..content_end].chars().count();
             turns.push(MessageTurn {
-                role: normalize_role(&role),
+                role: normalize_role(&role_cap),
                 content,
                 char_start,
                 char_end,
@@ -449,7 +450,11 @@ fn render_anthropic_blocks(turns: &[MessageTurn], system_prompt: &str) -> serde_
             system.push_str(&t.content);
             continue;
         }
-        let api_role = if role == "assistant" { "assistant" } else { "user" };
+        let api_role = if role == "assistant" {
+            "assistant"
+        } else {
+            "user"
+        };
         messages.push(serde_json::json!({
             "role": api_role,
             "content": [{"type": "text", "text": t.content}]
@@ -459,12 +464,12 @@ fn render_anthropic_blocks(turns: &[MessageTurn], system_prompt: &str) -> serde_
     if let Some(last) = messages.last_mut() {
         if let Some(content) = last.get_mut("content").and_then(|c| c.as_array_mut()) {
             if let Some(block) = content.last_mut() {
-                block.as_object_mut().map(|o| {
+                if let Some(o) = block.as_object_mut() {
                     o.insert(
                         "cache_control".into(),
                         serde_json::json!({"type": "ephemeral"}),
                     );
-                });
+                }
             }
         }
     }
@@ -679,9 +684,8 @@ impl SessionEngine {
             obj.insert("stream".into(), serde_json::json!(true));
             if let Some(sys) = obj.get_mut("system") {
                 if let Some(s) = sys.as_str() {
-                    *sys = serde_json::json!(s
-                        .replace("<|im_start|>", "")
-                        .replace("<|im_end|>", ""));
+                    *sys =
+                        serde_json::json!(s.replace("<|im_start|>", "").replace("<|im_end|>", ""));
                 }
             }
         }
@@ -724,11 +728,7 @@ impl SessionEngine {
     }
 
     /// Hot-swap active family + template without rewriting master_context.
-    pub fn swap_model(
-        &self,
-        family: &str,
-        template: Option<&str>,
-    ) -> UcpResult<(String, String)> {
+    pub fn swap_model(&self, family: &str, template: Option<&str>) -> UcpResult<(String, String)> {
         let mut state = self.inner.write();
         let fam = parse_family(family)?;
         let tmpl = if let Some(t) = template {
@@ -937,7 +937,9 @@ pub fn parse_family(s: &str) -> UcpResult<ModelFamily> {
         "anthropic" | "claude" | "claude-3.5" | "sonnet" => Ok(ModelFamily::Anthropic),
         "grok" | "xai" => Ok(ModelFamily::Grok),
         "openweight" | "open" | "local" | "hf" | "ollama" | "vllm" => Ok(ModelFamily::OpenWeight),
-        other => Err(UcpError::InvalidFamily(format!("unknown model family: {other}"))),
+        other => Err(UcpError::InvalidFamily(format!(
+            "unknown model family: {other}"
+        ))),
     }
 }
 
@@ -948,7 +950,9 @@ pub fn parse_template(s: &str) -> UcpResult<PromptTemplate> {
         "llama3" | "llama" => Ok(PromptTemplate::Llama3),
         "mistral" | "mistral_instruct" => Ok(PromptTemplate::MistralInstruct),
         "plain" => Ok(PromptTemplate::Plain),
-        other => Err(UcpError::InvalidTemplate(format!("unknown template: {other}"))),
+        other => Err(UcpError::InvalidTemplate(format!(
+            "unknown template: {other}"
+        ))),
     }
 }
 
@@ -959,7 +963,6 @@ pub fn default_template_for(fam: ModelFamily) -> PromptTemplate {
         ModelFamily::OpenWeight => PromptTemplate::ChatML,
     }
 }
-
 
 #[cfg(test)]
 mod tests {
