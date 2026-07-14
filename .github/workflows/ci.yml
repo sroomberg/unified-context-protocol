@@ -1,0 +1,86 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-D warnings"
+
+jobs:
+  rust:
+    name: Rust (core)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Format
+        run: cargo fmt --all -- --check
+
+      - name: Clippy (no Python)
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Test (no Python)
+        run: cargo test
+
+      - name: Clippy (python feature)
+        run: cargo clippy --all-targets --features python -- -D warnings
+
+      - name: Test (python feature)
+        run: cargo test --features python
+
+  python-bindings:
+    name: Python bindings (${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: python-${{ matrix.python-version }}
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install Python tooling
+        run: |
+          python -m pip install --upgrade pip
+          pip install maturin pytest pydantic pydantic-settings python-dotenv
+
+      # Use `build` + wheel install so CI does not need an activated venv.
+      # Clear pytest pythonpath so the source tree does not shadow the installed
+      # extension module (`ucp._engine`).
+      - name: Build and install wheel
+        run: |
+          maturin build --release --out dist
+          pip install dist/*.whl
+
+      - name: Pytest
+        run: pytest -q --override-ini pythonpath=
