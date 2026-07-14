@@ -3,8 +3,12 @@
 //! Enabled with `--features python`. Thin wrappers over the pure Rust
 //! [`crate::SessionEngine`] that release the GIL during tokenization.
 
+// PyO3 + `From<UcpError> for PyErr` trips `useless_conversion` on recent clippy
+// when pymethods return `PyResult` after `?` / `Into` conversion.
+#![allow(clippy::useless_conversion)]
+
 use crate::engine::{SessionEngine, CACHE_THRESHOLD_TOKENS};
-use crate::error::UcpError;
+use crate::error::{UcpError, UcpResult};
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
@@ -31,7 +35,7 @@ pub struct PySessionEngine {
 impl PySessionEngine {
     #[new]
     #[pyo3(signature = (system_prompt=None))]
-    fn new(system_prompt: Option<String>) -> PyResult<Self> {
+    fn new(system_prompt: Option<String>) -> UcpResult<Self> {
         Ok(Self {
             inner: Arc::new(SessionEngine::new(system_prompt)?),
         })
@@ -42,9 +46,9 @@ impl PySessionEngine {
         &self,
         py: Python<'_>,
         text: String,
-    ) -> PyResult<(usize, usize, usize)> {
+    ) -> UcpResult<(usize, usize, usize)> {
         let engine = Arc::clone(&self.inner);
-        Ok(py.allow_threads(move || engine.append_text_and_align(text))?)
+        py.allow_threads(move || engine.append_text_and_align(text))
     }
 
     #[pyo3(signature = (role, content))]
@@ -53,31 +57,31 @@ impl PySessionEngine {
         py: Python<'_>,
         role: String,
         content: String,
-    ) -> PyResult<(usize, usize, usize)> {
+    ) -> UcpResult<(usize, usize, usize)> {
         let engine = Arc::clone(&self.inner);
-        Ok(py.allow_threads(move || engine.append_turn(role, content))?)
+        py.allow_threads(move || engine.append_turn(role, content))
     }
 
-    fn get_openai_payload(&self) -> PyResult<String> {
-        Ok(self.inner.get_openai_payload()?)
+    fn get_openai_payload(&self) -> UcpResult<String> {
+        self.inner.get_openai_payload()
     }
 
-    fn get_anthropic_payload(&self) -> PyResult<String> {
-        Ok(self.inner.get_anthropic_payload()?)
+    fn get_anthropic_payload(&self) -> UcpResult<String> {
+        self.inner.get_anthropic_payload()
     }
 
-    fn get_grok_payload(&self) -> PyResult<String> {
-        Ok(self.inner.get_grok_payload()?)
+    fn get_grok_payload(&self) -> UcpResult<String> {
+        self.inner.get_grok_payload()
     }
 
     #[pyo3(signature = (include_raw_prompt=true))]
-    fn get_openweight_payload(&self, include_raw_prompt: bool) -> PyResult<String> {
-        Ok(self.inner.get_openweight_payload(include_raw_prompt)?)
+    fn get_openweight_payload(&self, include_raw_prompt: bool) -> UcpResult<String> {
+        self.inner.get_openweight_payload(include_raw_prompt)
     }
 
     #[pyo3(signature = (family, template=None))]
-    fn swap_model(&self, family: &str, template: Option<&str>) -> PyResult<(String, String)> {
-        Ok(self.inner.swap_model(family, template)?)
+    fn swap_model(&self, family: &str, template: Option<&str>) -> UcpResult<(String, String)> {
+        self.inner.swap_model(family, template)
     }
 
     fn get_active_model(&self) -> String {
@@ -109,8 +113,8 @@ impl PySessionEngine {
     }
 
     #[pyo3(signature = (path, target="anthropic"))]
-    fn load_hf_tokenizer(&self, path: String, target: &str) -> PyResult<String> {
-        Ok(self.inner.load_hf_tokenizer(path, target)?)
+    fn load_hf_tokenizer(&self, path: String, target: &str) -> UcpResult<String> {
+        self.inner.load_hf_tokenizer(path, target)
     }
 
     fn get_alignment_table<'py>(
