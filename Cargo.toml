@@ -1,0 +1,41 @@
+[package]
+name = "ucp"
+version = "0.1.0"
+edition = "2021"
+description = "Unified Context Protocol — cross-model context alignment and payload transposition infra"
+license = "MIT"
+authors = ["Unified Context Protocol"]
+readme = "README.md"
+
+[lib]
+name = "ucp"
+# `cdylib` is for the optional Python extension; `rlib` is the primary Rust crate.
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = []
+# Optional PyO3 bindings (`ucp._engine`). Enable via `maturin` or `--features python`.
+python = ["dep:pyo3"]
+
+[dependencies]
+rayon = "1.10"
+parking_lot = "0.12"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "1.0"
+tiktoken-rs = "0.6"
+tokenizers = { version = "0.20", default-features = false, features = ["onig"] }
+once_cell = "1.19"
+regex = "1.11"
+# Pinned for rustc 1.83 compatibility (tokenizers transitive dep).
+unicode-segmentation = "=1.12.0"
+pyo3 = { version = "0.22", features = ["extension-module", "abi3-py39"], optional = true }
+
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = 3
+strip = true
+
+[profile.dev]
+opt-level = 1
