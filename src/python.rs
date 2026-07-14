@@ -44,8 +44,7 @@ impl PySessionEngine {
         text: String,
     ) -> PyResult<(usize, usize, usize)> {
         let engine = Arc::clone(&self.inner);
-        py.allow_threads(move || engine.append_text_and_align(text))
-            .map_err(PyErr::from)
+        Ok(py.allow_threads(move || engine.append_text_and_align(text))?)
     }
 
     #[pyo3(signature = (role, content))]
@@ -56,32 +55,29 @@ impl PySessionEngine {
         content: String,
     ) -> PyResult<(usize, usize, usize)> {
         let engine = Arc::clone(&self.inner);
-        py.allow_threads(move || engine.append_turn(role, content))
-            .map_err(PyErr::from)
+        Ok(py.allow_threads(move || engine.append_turn(role, content))?)
     }
 
     fn get_openai_payload(&self) -> PyResult<String> {
-        self.inner.get_openai_payload().map_err(PyErr::from)
+        Ok(self.inner.get_openai_payload()?)
     }
 
     fn get_anthropic_payload(&self) -> PyResult<String> {
-        self.inner.get_anthropic_payload().map_err(PyErr::from)
+        Ok(self.inner.get_anthropic_payload()?)
     }
 
     fn get_grok_payload(&self) -> PyResult<String> {
-        self.inner.get_grok_payload().map_err(PyErr::from)
+        Ok(self.inner.get_grok_payload()?)
     }
 
     #[pyo3(signature = (include_raw_prompt=true))]
     fn get_openweight_payload(&self, include_raw_prompt: bool) -> PyResult<String> {
-        self.inner
-            .get_openweight_payload(include_raw_prompt)
-            .map_err(PyErr::from)
+        Ok(self.inner.get_openweight_payload(include_raw_prompt)?)
     }
 
     #[pyo3(signature = (family, template=None))]
     fn swap_model(&self, family: &str, template: Option<&str>) -> PyResult<(String, String)> {
-        self.inner.swap_model(family, template).map_err(PyErr::from)
+        Ok(self.inner.swap_model(family, template)?)
     }
 
     fn get_active_model(&self) -> String {
@@ -114,9 +110,7 @@ impl PySessionEngine {
 
     #[pyo3(signature = (path, target="anthropic"))]
     fn load_hf_tokenizer(&self, path: String, target: &str) -> PyResult<String> {
-        self.inner
-            .load_hf_tokenizer(path, target)
-            .map_err(PyErr::from)
+        Ok(self.inner.load_hf_tokenizer(path, target)?)
     }
 
     fn get_alignment_table<'py>(
