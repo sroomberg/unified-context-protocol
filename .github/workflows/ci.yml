@@ -74,8 +74,13 @@ jobs:
           python -m pip install --upgrade pip
           pip install maturin pytest pydantic pydantic-settings python-dotenv
 
-      - name: Build & install bindings
-        run: maturin develop
+      # Use `build` + wheel install so CI does not need an activated venv.
+      # Clear pytest pythonpath so the source tree does not shadow the installed
+      # extension module (`ucp._engine`).
+      - name: Build and install wheel
+        run: |
+          maturin build --release --out dist
+          pip install dist/*.whl
 
       - name: Pytest
-        run: pytest -q
+        run: pytest -q --override-ini pythonpath=
