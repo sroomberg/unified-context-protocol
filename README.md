@@ -1,4 +1,4 @@
-# Unified Context Protocol (UCP)
+# Unified Context Protocol (UCP) *EXPERIMENTAL*
 
 **Rust-first infrastructure** for linear cross-model context, tokenizer alignment,
 and provider payload transposition.
