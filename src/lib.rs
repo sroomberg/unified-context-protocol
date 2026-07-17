@@ -32,5 +32,24 @@ pub use engine::{
 };
 pub use error::{UcpError, UcpResult};
 
+/// Crate version from `Cargo.toml` (SemVer).
+///
+/// Kept in sync with `pyproject.toml` / `ucp.__version__` by release-please.
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+
+#[cfg(test)]
+mod version_tests {
+    use super::VERSION;
+
+    #[test]
+    fn version_is_semver() {
+        let parts: Vec<_> = VERSION.split('.').collect();
+        assert!(parts.len() >= 3, "expected MAJOR.MINOR.PATCH, got {VERSION}");
+        for part in &parts[..3] {
+            assert!(part.parse::<u64>().is_ok(), "non-numeric SemVer component in {VERSION}");
+        }
+    }
+}
+
 #[cfg(feature = "python")]
 mod python;

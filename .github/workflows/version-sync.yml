@@ -1,0 +1,34 @@
+name: Version sync
+
+on:
+  pull_request:
+    branches: [master, main]
+    paths:
+      - "Cargo.toml"
+      - "pyproject.toml"
+      - "python/ucp/__init__.py"
+      - ".release-please-manifest.json"
+      - ".github/workflows/version-sync.yml"
+      - "scripts/check_versions.sh"
+  push:
+    branches: [master, main]
+    paths:
+      - "Cargo.toml"
+      - "pyproject.toml"
+      - "python/ucp/__init__.py"
+      - ".release-please-manifest.json"
+      - "scripts/check_versions.sh"
+
+permissions:
+  contents: read
+
+jobs:
+  semver-sync:
+    name: SemVer sources match
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check version consistency
+        run: bash scripts/check_versions.sh

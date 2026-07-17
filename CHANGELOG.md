@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Rustdoc / Python docstrings on major public APIs
 - Keep a Changelog policy and release-please automation
+- Explicit SemVer policy (`VERSIONING.md`), `ucp::VERSION`, and version-sync CI
 
 ## [0.1.0] - 2026-07-12
 
