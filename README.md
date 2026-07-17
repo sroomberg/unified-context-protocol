@@ -100,7 +100,8 @@ Optional tokenizer paths: `UCP_ANTHROPIC_TOKENIZER_PATH` /
 ## Changelog & releases
 
 This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
-and [Semantic Versioning](https://semver.org/). See [`CHANGELOG.md`](CHANGELOG.md).
+and [Semantic Versioning](https://semver.org/). See [`CHANGELOG.md`](CHANGELOG.md)
+and [`VERSIONING.md`](VERSIONING.md).
 
 **Pull requests** must either:
 
@@ -108,6 +109,18 @@ and [Semantic Versioning](https://semver.org/). See [`CHANGELOG.md`](CHANGELOG.m
 2. Use a [Conventional Commits](https://www.conventionalcommits.org/) PR title
    (`feat:`, `fix:`, `docs:`, …), or
 3. Carry the `skip-changelog` label
+
+**SemVer bumps** (via Conventional Commits → release-please):
+
+| Commit | Pre-1.0 bump | ≥1.0 bump |
+|---|---|---|
+| `feat:` | minor | minor |
+| `fix:` | patch | patch |
+| `BREAKING CHANGE` / `feat!:` | minor | major |
+
+Version strings are kept identical across `Cargo.toml`, `pyproject.toml`,
+`python/ucp/__init__.py`, and `.release-please-manifest.json` (enforced by CI).
+In Rust, read `ucp::VERSION`; in Python, `ucp.__version__`.
 
 **Releases** are automated by [release-please](https://github.com/googleapis/release-please):
 
