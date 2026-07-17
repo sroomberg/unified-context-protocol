@@ -26,27 +26,44 @@ static ANTHROPIC_HEADER: Lazy<Regex> = Lazy::new(|| {
 });
 
 /// Absolute character span mapped to a single model token.
+///
+/// Offsets are Unicode scalar values (Rust `char` indices) into
+/// [`SessionEngine::get_master_context`], not UTF-8 byte indices.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TokenSpan {
+    /// Inclusive start character index in the master context.
     pub char_start: usize,
+    /// Exclusive end character index in the master context.
     pub char_end: usize,
+    /// Tokenizer-specific token identifier.
     pub token_id: u32,
 }
 
+/// Logical model family used for template selection and cache accounting.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ModelFamily {
+    /// OpenAI Chat Completions / GPT models (tiktoken alignment).
     OpenAI = 0,
+    /// Anthropic Messages API / Claude models.
     Anthropic = 1,
+    /// xAI Grok (OpenAI-compatible messages).
     Grok = 2,
+    /// Local or hosted open-weight OpenAI-compatible servers.
     OpenWeight = 3,
 }
 
+/// Prompt template used when rendering open-weight / raw prompts.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PromptTemplate {
+    /// ChatML (`<|im_start|>` / `<|im_end|>`) markers.
     ChatML = 0,
+    /// Anthropic System/Human/Assistant block layout.
     AnthropicBlocks = 1,
+    /// Llama 3 instruct headers.
     Llama3 = 2,
+    /// Mistral `[INST]` instruct format.
     MistralInstruct = 3,
+    /// Unstructured plain text.
     Plain = 4,
 }
 
@@ -101,6 +118,11 @@ struct MessageTurn {
 }
 
 /// Thread-safe dual-tokenizer session engine (pure Rust API).
+///
+/// Maintains an append-only master conversation transcript and keeps
+/// OpenAI (tiktoken), Anthropic-side, and open-weight token alignment tables
+/// in sync so a consuming runtime can hot-swap providers without rewriting
+/// history.
 pub struct SessionEngine {
     inner: Arc<RwLock<SessionState>>,
 }
@@ -582,6 +604,11 @@ fn strip_foreign_control_flags(text: &str, target: ModelFamily) -> String {
 }
 
 impl SessionEngine {
+    /// Create a new empty session, optionally seeding the system prompt.
+    ///
+    /// The system prompt is stored for payload rendering; call
+    /// [`Self::append_turn`] with role `system` if it should also appear in
+    /// the linear master context.
     pub fn new(system_prompt: Option<String>) -> UcpResult<Self> {
         let mut state = SessionState::new()?;
         if let Some(sp) = system_prompt {
@@ -592,7 +619,10 @@ impl SessionEngine {
         })
     }
 
-    /// Append text to the immutable-linear master context and realign all tokenizers.
+    /// Append raw text to the linear master context and realign all tokenizers.
+    ///
+    /// Prefer [`Self::append_turn`] for structured chat. Returns
+    /// `(openai_tokens, anthropic_tokens, openweight_tokens)`.
     pub fn append_text_and_align(&self, text: String) -> UcpResult<(usize, usize, usize)> {
         if text.is_empty() {
             return Ok(self.token_counts());
@@ -626,7 +656,11 @@ impl SessionEngine {
         ))
     }
 
-    /// Append a structured role turn (preferred over raw text for chat).
+    /// Append a structured role turn and realign tokenizers.
+    ///
+    /// Roles are normalized (`human` → `user`, etc.) and written into the
+    /// master context using Anthropic-style `System:` / `Human:` / `Assistant:`
+    /// prefixes. Returns `(openai_tokens, anthropic_tokens, openweight_tokens)`.
     pub fn append_turn(&self, role: String, content: String) -> UcpResult<(usize, usize, usize)> {
         let role_n = normalize_role(&role);
         let formatted = match role_n.as_str() {
@@ -654,7 +688,9 @@ impl SessionEngine {
         ))
     }
 
-    /// OpenAI Chat Completions JSON payload.
+    /// Build an OpenAI Chat Completions JSON body (`messages` + `stream`).
+    ///
+    /// Anthropic-only control flags are stripped from the rendered content.
     pub fn get_openai_payload(&self) -> UcpResult<String> {
         let state = self.inner.read();
         let cleaned = strip_foreign_control_flags(&state.master_context, ModelFamily::OpenAI);
@@ -670,7 +706,10 @@ impl SessionEngine {
         serde_json::to_string(&obj).map_err(|e| UcpError::Serialize(e.to_string()))
     }
 
-    /// Anthropic Messages API JSON payload with ephemeral cache_control on last block.
+    /// Build an Anthropic Messages API JSON body.
+    ///
+    /// Attaches `cache_control: { "type": "ephemeral" }` to the last content
+    /// block so provider prompt caching can activate (5-minute TTL).
     pub fn get_anthropic_payload(&self) -> UcpResult<String> {
         let state = self.inner.read();
         let cleaned = strip_foreign_control_flags(&state.master_context, ModelFamily::Anthropic);
@@ -692,12 +731,17 @@ impl SessionEngine {
         serde_json::to_string(&payload).map_err(|e| UcpError::Serialize(e.to_string()))
     }
 
-    /// Grok (xAI) uses OpenAI-compatible messages.
+    /// Build a Grok (xAI) Chat Completions JSON body.
+    ///
+    /// Grok is OpenAI-compatible; this is equivalent to [`Self::get_openai_payload`].
     pub fn get_grok_payload(&self) -> UcpResult<String> {
         self.get_openai_payload()
     }
 
-    /// Open-weight / local OpenAI-compatible payload.
+    /// Build an open-weight / local OpenAI-compatible JSON body.
+    ///
+    /// When `include_raw_prompt` is true, also emits `raw_prompt` and `template`
+    /// fields rendered with the active open-weight [`PromptTemplate`].
     pub fn get_openweight_payload(&self, include_raw_prompt: bool) -> UcpResult<String> {
         let state = self.inner.read();
         let cleaned = strip_foreign_control_flags(&state.master_context, ModelFamily::OpenWeight);
@@ -727,7 +771,10 @@ impl SessionEngine {
         serde_json::to_string(&payload).map_err(|e| UcpError::Serialize(e.to_string()))
     }
 
-    /// Hot-swap active family + template without rewriting master_context.
+    /// Hot-swap the active model family (and optional template) in place.
+    ///
+    /// Does not rewrite [`Self::get_master_context`]. Returns
+    /// `(family_debug_name, template_debug_name)`.
     pub fn swap_model(&self, family: &str, template: Option<&str>) -> UcpResult<(String, String)> {
         let mut state = self.inner.write();
         let fam = parse_family(family)?;
@@ -744,23 +791,27 @@ impl SessionEngine {
         Ok((format!("{:?}", fam), format!("{:?}", tmpl)))
     }
 
+    /// Debug name of the active [`ModelFamily`] (e.g. `"Anthropic"`).
     pub fn get_active_model(&self) -> String {
         format!("{:?}", self.inner.read().active_family)
     }
 
+    /// Full append-only master conversation transcript.
     pub fn get_master_context(&self) -> String {
         self.inner.read().master_context.clone()
     }
 
+    /// Current system prompt used when rendering provider payloads.
     pub fn get_system_prompt(&self) -> String {
         self.inner.read().system_prompt.clone()
     }
 
+    /// Replace the system prompt used for subsequent payload renders.
     pub fn set_system_prompt(&self, prompt: String) {
         self.inner.write().system_prompt = prompt;
     }
 
-    /// Token counts: (openai, anthropic, openweight).
+    /// Token counts as `(openai, anthropic, openweight)`.
     pub fn token_counts(&self) -> (usize, usize, usize) {
         let state = self.inner.read();
         (
@@ -771,6 +822,9 @@ impl SessionEngine {
     }
 
     /// Cache warmth factor for a provider in \[0.0, 1.0\].
+    ///
+    /// Computed as `min(warm, live) / max(CACHE_THRESHOLD_TOKENS, live)` where
+    /// `warm` comes from [`Self::set_cache_warm_tokens`] (runtime-reported).
     pub fn cache_warmth_factor(&self, provider: &str) -> f64 {
         let state = self.inner.read();
         let key = provider.to_lowercase();
@@ -788,6 +842,9 @@ impl SessionEngine {
         (covered / denom).clamp(0.0, 1.0)
     }
 
+    /// Record how many prefix tokens a runtime observed as cache-warm for `provider`.
+    ///
+    /// Call this after dual-write / completion responses that report prompt-cache hits.
     pub fn set_cache_warm_tokens(&self, provider: &str, tokens: usize) {
         let mut state = self.inner.write();
         state
@@ -795,7 +852,10 @@ impl SessionEngine {
             .insert(provider.to_lowercase(), tokens);
     }
 
-    /// Load a HuggingFace `tokenizer.json` for Anthropic-style or open-weight alignment.
+    /// Load a HuggingFace `tokenizer.json` for precise Anthropic or open-weight alignment.
+    ///
+    /// `target` may be `anthropic`, `openweight`, or a custom alias registered in
+    /// the extra-backend table. Re-aligns all tables after load.
     pub fn load_hf_tokenizer(&self, path: String, target: &str) -> UcpResult<String> {
         let p = Path::new(&path);
         if !p.exists() {
@@ -830,7 +890,9 @@ impl SessionEngine {
         Ok(format!("loaded {path} for {target}"))
     }
 
-    /// Export alignment table for a family.
+    /// Export the token alignment table for a model family.
+    ///
+    /// Accepts aliases such as `gpt` / `claude` / `local` in addition to canonical names.
     pub fn get_alignment_table(&self, family: &str) -> UcpResult<Vec<TokenSpan>> {
         let state = self.inner.read();
         let spans = match family.to_lowercase().as_str() {
@@ -849,6 +911,8 @@ impl SessionEngine {
     }
 
     /// Map an absolute character index to the nearest token index for a family.
+    ///
+    /// Returns `0` when the table is empty; otherwise the covering token or the last index.
     pub fn char_to_token_index(&self, family: &str, char_index: usize) -> usize {
         let state = self.inner.read();
         let spans: &[TokenSpan] = match family.to_lowercase().as_str() {
@@ -868,6 +932,8 @@ impl SessionEngine {
     }
 
     /// Snapshot of engine stats as JSON-friendly map values.
+    ///
+    /// Includes token counts, active family/template, turn count, and cache warmth.
     pub fn stats(&self) -> HashMap<String, serde_json::Value> {
         let state = self.inner.read();
         let mut d = HashMap::new();
@@ -915,6 +981,7 @@ impl SessionEngine {
         d
     }
 
+    /// Clear master context, turns, alignment tables, and cache-warm counters.
     pub fn clear(&self) {
         let mut state = self.inner.write();
         state.master_context.clear();
@@ -931,6 +998,9 @@ impl SessionEngine {
     }
 }
 
+/// Parse a user-facing family alias into a [`ModelFamily`].
+///
+/// Accepts names such as `gpt`, `claude`, `xai`, `ollama`, and `vllm`.
 pub fn parse_family(s: &str) -> UcpResult<ModelFamily> {
     match s.to_lowercase().as_str() {
         "openai" | "gpt" | "gpt-5.5" | "gpt5.5" | "oai" => Ok(ModelFamily::OpenAI),
@@ -943,6 +1013,7 @@ pub fn parse_family(s: &str) -> UcpResult<ModelFamily> {
     }
 }
 
+/// Parse a user-facing template alias into a [`PromptTemplate`].
 pub fn parse_template(s: &str) -> UcpResult<PromptTemplate> {
     match s.to_lowercase().as_str() {
         "chatml" => Ok(PromptTemplate::ChatML),
@@ -956,6 +1027,7 @@ pub fn parse_template(s: &str) -> UcpResult<PromptTemplate> {
     }
 }
 
+/// Default [`PromptTemplate`] for a [`ModelFamily`].
 pub fn default_template_for(fam: ModelFamily) -> PromptTemplate {
     match fam {
         ModelFamily::OpenAI | ModelFamily::Grok => PromptTemplate::ChatML,
