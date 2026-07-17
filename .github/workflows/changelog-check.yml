@@ -1,0 +1,63 @@
+name: Changelog check
+
+on:
+  pull_request:
+    branches: [master, main]
+    paths:
+      - "src/**"
+      - "python/**"
+      - "Cargo.toml"
+      - "pyproject.toml"
+      - "tests/**"
+      - "CHANGELOG.md"
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: changelog-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  changelog:
+    name: Require changelog signal
+    runs-on: ubuntu-latest
+    # Skip automated release-please PRs and explicitly labeled exceptions.
+    if: >-
+      ${{
+        !startsWith(github.head_ref, 'release-please')
+        && !contains(github.event.pull_request.labels.*.name, 'skip-changelog')
+        && !contains(github.event.pull_request.labels.*.name, 'autorelease: pending')
+      }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check CHANGELOG or conventional commits
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          set -euo pipefail
+
+          if git diff --name-only "$BASE_SHA" "$HEAD_SHA" | grep -qx 'CHANGELOG.md'; then
+            echo "OK: CHANGELOG.md updated (Keep a Changelog)."
+            exit 0
+          fi
+
+          # Conventional Commits → release-please will update CHANGELOG on the Release PR.
+          if printf '%s\n' "$PR_TITLE" | grep -Eq '^(feat|fix|perf|refactor|docs|chore|ci|test|build|style)(\(.+\))?\!?:'; then
+            echo "OK: PR title uses Conventional Commits; release-please will maintain CHANGELOG."
+            exit 0
+          fi
+
+          echo "::error::Code changed without a changelog signal."
+          echo "Do one of the following:"
+          echo "  1. Add an entry under ## [Unreleased] in CHANGELOG.md"
+          echo "  2. Use a Conventional Commit PR title (feat:/fix:/docs:/…)"
+          echo "  3. Apply the skip-changelog label"
+          exit 1
