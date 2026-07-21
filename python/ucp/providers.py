@@ -23,6 +23,13 @@ class ProviderId(str, Enum):
 
     @classmethod
     def parse(cls, value: str) -> "ProviderId":
+        """Parse a user-facing alias into a canonical ``ProviderId``.
+
+        Accepts names such as ``gpt``, ``claude``, ``xai``, ``ollama``, and ``vllm``.
+
+        Raises:
+            ValueError: If ``value`` does not match a known alias.
+        """
         key = value.strip().lower().lstrip("/")
         aliases: dict[str, ProviderId] = {
             "openai": cls.OPENAI,
