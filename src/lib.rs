@@ -44,9 +44,15 @@ mod version_tests {
     #[test]
     fn version_is_semver() {
         let parts: Vec<_> = VERSION.split('.').collect();
-        assert!(parts.len() >= 3, "expected MAJOR.MINOR.PATCH, got {VERSION}");
+        assert!(
+            parts.len() >= 3,
+            "expected MAJOR.MINOR.PATCH, got {VERSION}"
+        );
         for part in &parts[..3] {
-            assert!(part.parse::<u64>().is_ok(), "non-numeric SemVer component in {VERSION}");
+            assert!(
+                part.parse::<u64>().is_ok(),
+                "non-numeric SemVer component in {VERSION}"
+            );
         }
     }
 }
