@@ -14,7 +14,12 @@ TemplateName = Literal["chatml", "anthropic_blocks", "llama3", "mistral", "plain
 
 
 class ProtocolSettings(BaseSettings):
-    """UCP infra configuration: templates, thresholds, optional tokenizer paths."""
+    """UCP infra configuration: templates, thresholds, optional tokenizer paths.
+
+    All fields can be overridden via ``UCP_*`` environment variables (see
+    ``.env.example``). This settings object never holds API keys or base URLs —
+    those belong to the consuming runtime.
+    """
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -25,18 +30,37 @@ class ProtocolSettings(BaseSettings):
         env_prefix="UCP_",
     )
 
-    default_family: ProviderName = Field(default="anthropic")
-    openweight_template: TemplateName = Field(default="chatml")
-    anthropic_tokenizer_path: str = Field(default="")
-    openweight_tokenizer_path: str = Field(default="")
+    default_family: ProviderName = Field(
+        default="anthropic",
+        description="Default model family alias for new sessions.",
+    )
+    openweight_template: TemplateName = Field(
+        default="chatml",
+        description="Prompt template used when rendering open-weight raw prompts.",
+    )
+    anthropic_tokenizer_path: str = Field(
+        default="",
+        description="Optional path to a HuggingFace tokenizer.json for Anthropic alignment.",
+    )
+    openweight_tokenizer_path: str = Field(
+        default="",
+        description="Optional path to a HuggingFace tokenizer.json for open-weight alignment.",
+    )
     system_prompt: str = Field(
         default=(
             "You are a helpful assistant. Prior turns may have been produced by "
             "a different model family; continue coherently."
-        )
+        ),
+        description="Default system prompt seeded into SessionEngine.",
     )
-    cache_threshold_tokens: int = Field(default=1024)
-    openweight_enable_prefix_cache_hint: bool = Field(default=True)
+    cache_threshold_tokens: int = Field(
+        default=1024,
+        description="Token threshold typically required before provider caches activate.",
+    )
+    openweight_enable_prefix_cache_hint: bool = Field(
+        default=True,
+        description="When true, open-weight payloads include a prefix_caching hint.",
+    )
 
     @field_validator("default_family", mode="before")
     @classmethod

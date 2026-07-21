@@ -232,5 +232,6 @@ fn _engine(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyModelFamily>()?;
     m.add_class::<PyPromptTemplate>()?;
     m.add("CACHE_THRESHOLD_TOKENS", CACHE_THRESHOLD_TOKENS)?;
+    m.add("VERSION", env!("CARGO_PKG_VERSION"))?;
     Ok(())
 }

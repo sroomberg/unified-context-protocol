@@ -1,0 +1,37 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "packages": {
+    ".": {
+      "release-type": "rust",
+      "package-name": "ucp",
+      "changelog-path": "CHANGELOG.md",
+      "versioning": "default",
+      "bump-minor-pre-major": true,
+      "bump-patch-for-minor-pre-major": true,
+      "include-component-in-tag": false,
+      "include-v-in-tag": true,
+      "pull-request-title-pattern": "chore: release ${version}",
+      "changelog-sections": [
+        { "type": "feat", "section": "Added" },
+        { "type": "fix", "section": "Fixed" },
+        { "type": "perf", "section": "Changed" },
+        { "type": "refactor", "section": "Changed" },
+        { "type": "docs", "section": "Changed" },
+        { "type": "deps", "section": "Changed" },
+        { "type": "chore", "section": "Changed", "hidden": true },
+        { "type": "ci", "section": "Changed", "hidden": true },
+        { "type": "test", "section": "Changed", "hidden": true },
+        { "type": "style", "section": "Changed", "hidden": true },
+        { "type": "build", "section": "Changed", "hidden": true }
+      ],
+      "extra-files": [
+        {
+          "type": "toml",
+          "path": "pyproject.toml",
+          "jsonpath": "$.project.version"
+        },
+        "python/ucp/__init__.py"
+      ]
+    }
+  }
+}
