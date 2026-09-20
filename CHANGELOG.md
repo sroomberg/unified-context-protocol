@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.2](https://github.com/sroomberg/unified-context-protocol/compare/v0.1.1...v0.1.2) (2026-09-20)
+
+
+### Added
+
+* enforce SemVer across manifests and release automation ([514ae92](https://github.com/sroomberg/unified-context-protocol/commit/514ae921221b22f0edbdf6c6659f69d8bee4f9aa))
+
+
+### Changed
+
+* add rustdoc and Python docstrings on public APIs ([5d2ca27](https://github.com/sroomberg/unified-context-protocol/commit/5d2ca27c8f1e66eb54283d73831b8acdbc330ae7))
+
 ## [Unreleased]
 
 ## [0.1.1] - 2026-09-20
