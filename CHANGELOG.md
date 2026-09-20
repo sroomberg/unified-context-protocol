@@ -7,11 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-09-20
+
 ### Added
 
-- Rustdoc / Python docstrings on major public APIs
+- SemVer enforcement across manifests, `ucp::VERSION`, and version-sync CI
 - Keep a Changelog policy and release-please automation
-- Explicit SemVer policy (`VERSIONING.md`), `ucp::VERSION`, and version-sync CI
+- Rustdoc and Python docstrings on major public APIs
 
 ## [0.1.0] - 2026-07-12
 
@@ -22,5 +24,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Optional PyO3 / Python bindings behind the `python` Cargo feature
 - CI workflow for Rust and Python matrix tests
 
-[Unreleased]: https://github.com/sroomberg/unified-context-protocol/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/sroomberg/unified-context-protocol/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/sroomberg/unified-context-protocol/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/sroomberg/unified-context-protocol/releases/tag/v0.1.0
