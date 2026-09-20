@@ -18,6 +18,26 @@ jobs:
     name: Update changelog & GitHub release
     runs-on: ubuntu-latest
     steps:
+      # When PR creation is blocked, release-please can leave an orphaned branch
+      # with no open Release PR. Remove it so the next run starts clean.
+      - name: Remove orphaned release-please branch
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
+        run: |
+          set -euo pipefail
+          branch="release-please--branches--master--components--ucp"
+          open_prs="$(gh pr list --head "$branch" --state open --json number --jq 'length')"
+          if [ "$open_prs" != "0" ]; then
+            echo "Release PR already open for ${branch}; keeping branch."
+            exit 0
+          fi
+          if gh api "repos/${{ github.repository }}/git/ref/heads/${branch}" >/dev/null 2>&1; then
+            echo "Deleting orphaned ${branch} (no open Release PR)."
+            gh api -X DELETE "repos/${{ github.repository }}/git/refs/heads/${branch}"
+          else
+            echo "No orphaned ${branch} branch."
+          fi
+
       # release-please needs permission to open/update Release PRs. Either enable
       # Settings → Actions → "Allow GitHub Actions to create and approve pull
       # requests", or add a RELEASE_PLEASE_TOKEN secret (repo-scoped PAT).
