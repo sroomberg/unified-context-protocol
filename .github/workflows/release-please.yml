@@ -3,6 +3,7 @@ name: Release Please
 on:
   push:
     branches: [master, main]
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -17,18 +18,45 @@ jobs:
     name: Update changelog & GitHub release
     runs-on: ubuntu-latest
     steps:
+      # release-please needs permission to open/update Release PRs. Either enable
+      # Settings → Actions → "Allow GitHub Actions to create and approve pull
+      # requests", or add a RELEASE_PLEASE_TOKEN secret (repo-scoped PAT).
       - name: Run release-please
         id: release
+        continue-on-error: true
         uses: googleapis/release-please-action@v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+
+      - name: Handle release-please result
+        if: always()
+        env:
+          RELEASE_PLEASE_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+        run: |
+          set -euo pipefail
+          outcome="${{ steps.release.outcome }}"
+
+          if [ "$outcome" = "success" ]; then
+            echo "release-please completed successfully."
+            exit 0
+          fi
+
+          if [ -n "$RELEASE_PLEASE_TOKEN" ]; then
+            echo "::error::release-please failed with RELEASE_PLEASE_TOKEN configured."
+            exit 1
+          fi
+
+          echo "::warning::release-please could not open a Release PR."
+          echo "Enable Settings → Actions → Allow GitHub Actions to create and approve pull requests,"
+          echo "or add a RELEASE_PLEASE_TOKEN repository secret (repo-scoped PAT)."
+          echo "Release branch updates may still exist at release-please--branches--master--components--ucp."
 
       # On ordinary pushes, release-please opens/updates a Release PR whose body
       # and CHANGELOG.md summarize commits since the last tag.
       # When that Release PR is merged, this workflow runs again and creates the
       # GitHub Release + git tag (releases_created=true).
       - name: Note release creation
-        if: ${{ steps.release.outputs.releases_created == 'true' }}
+        if: ${{ steps.release.outcome == 'success' && steps.release.outputs.releases_created == 'true' }}
         run: echo "Published GitHub release ${{ steps.release.outputs.tag_name }}"
